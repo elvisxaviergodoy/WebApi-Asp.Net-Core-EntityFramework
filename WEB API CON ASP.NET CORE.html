@@ -1,0 +1,293 @@
+<!-- 
+	****** CREACIÓN DE LA BASE DE DATOS EN SQLSERVER ******
+- Abro el sql server managment
+	- Voy a la carpeta seguridad
+	- login
+	- sa
+		- Click derecho y propiedades
+		- establecemos una contraseña 
+		- verifico que el role(serverRole) este como sysadmin
+		- Click en OK
+	- me desconecto e inicio sesion con el usuario que acabo de confirmar
+	- creamos la bd (api)
+	- creo la tabla (futbolistas) y agrego sus datos
+		create database api;
+		go
+		use api;
+		go
+		create table futbolistas(
+			id int identity primary key,
+			nombre varchar(50) not null,
+			posicion varchar(20) not null,
+			nacionalidad varchar(25) not null,
+			imagen text not null
+		);
+
+		go
+
+		insert into futbolistas 
+		values('Pabel','Mediocampista','Checa','https://tomato-timer.com/'),
+		('Paolo','Defensa','Italiana','https://tomato-timer.com/'),
+		('Zinedine','Mediocampista','Francesa','https://tomato-timer.com/'),
+		('Oliver','Portero','Alemana','https://tomato-timer.com/');
+
+
+
+	****** CREACIÓN DE PROYECTO EN .NET CORE ******
+- Seleccionamos como proyecto "ASP.NET Core Web Api" 
+- Siguiente
+- nombre (apifutbolistas)
+	- selecciono la ruta 
+	- quito el check de "colocar la solución y el proyecto en el mismo directorio"
+- Crear
+
+
+
+	****** CREACIÓN DEL MODELO ******
+- Es la representación de la estructura de la tabla dentro de la aplicación
+	- Agrego una carpeta llamada Models 
+		- Crear una clase (Futbolista)
+			- dentro de esta clase va cada uno de los campos de la bd 
+				using System;
+				using System.Collections.Generic;
+				//libreria para la PK
+				using System.ComponentModel.DataAnnotations;
+				using System.Linq;
+				using System.Threading.Tasks;
+
+				namespace apiFutbolistas.Models
+				{
+				    public class Futbolista
+				    {
+				        /*Agregamos todos los campos de la tabla futbolistas*/
+				        [Key]/*Importamos la libreria(System.ComponentModel.DataAnnotations) para indicar que esta es la PK*/
+				        //los nombres tienen que coincidir con los que esta en la bd
+				        public int id { get; set; }
+				        public string nombre { get; set; }
+				        public string posicion { get; set; }
+				        public string nacionalidad { get; set; }
+				        public string imagen { get; set; }
+				    }
+				}
+
+
+	****** CREACIÓN DEL CONTEXTO DE DATOS ******
+- Esta sirve de intermediario entre el controlador y el modelo
+- agrego una carpeta llamada Context
+	- Creo una clase dentro de Context (AppDbContext)
+	- para que sea mas rapido se hara con entityframework entonces se debe instalar el paquete Microsoft.EntityFrameworkCore
+		- click derecho sobre dependencias 
+		- administrar paquetes NuGet
+			- instalamos Microsoft.EntityFrameworkCore y agregamos su referencia
+	- 
+		//modelo
+		using apiFutbolistas.Models;
+		//libreria para trabajar con entityFramework
+		using Microsoft.EntityFrameworkCore;
+		using System;
+		using System.Collections.Generic;
+		using System.Linq;
+		using System.Threading.Tasks;
+
+		namespace apiFutbolistas.Context
+		{
+		    //                          :heredamos de DbContext
+		    public class AppDbContext : DbContext
+		    {
+		        //constructor                   del tipo AppDbContext
+		        public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
+		        {
+
+		        }
+		        //representación de la tabla
+		        //    del mismo tipo del modelo, futbolista es y tiene que ser del nombre de la tabla
+		        public DbSet<Futbolista> futbolistas { get; set; }//importar el modelo de Futbolista
+		    }
+		}
+
+
+	****** CONTROLADOR ******
+- Creo la carpeta Controllers
+	- agrego el Controlador de API con acciones de lectura y escritura (FutbolistaController.cs) se debe dejar la palabra controller para que la aplicación sepa que es un controlador 
+		//libreria contexto
+		using apiFutbolistas.Context;
+		//libreria modelo
+		using apiFutbolistas.Models;
+		using Microsoft.AspNetCore.Mvc;
+		using Microsoft.EntityFrameworkCore;
+		using System;
+		using System.Collections.Generic;
+		using System.Linq;
+		using System.Threading.Tasks;
+
+		// For more information on enabling Web API for empty projects, visit https://go.microsoft.com/fwlink/?LinkID=397860
+
+		namespace apiFutbolistas.Controllers
+		{
+		    [Route("api/[controller]")]
+		    [ApiController]
+		    public class FutbolistaController : ControllerBase
+		    {
+		        //mando a llamar a mi contexto, importo la libreria para el contexto
+		        private readonly AppDbContext context;
+		        //creo un constructor para este controlador
+		        public FutbolistaController(AppDbContext context)
+		        {
+		            this.context = context;
+		        }
+		        // GET: api/<FutbolistaController>
+		        [HttpGet]
+		        public ActionResult Get()
+		        {
+		            //manejo de errores con try
+		            try
+		            {
+		                //regreso al cliente con todos los registros
+		                return Ok(context.futbolistas.ToList());
+		            }
+		            catch (Exception ex)
+		            {
+
+		                return BadRequest(ex.Message);
+		            }
+		        }
+
+		        // GET api/<FutbolistaController>/5
+		        //como el get id se va reutilziar en otros metodos le agrego el nombre GetFutbolista
+		        [HttpGet("{id}", Name ="GetFutbolista")]
+		        public ActionResult Get(int id)
+		        {
+		            try
+		            {
+		                //declaro una variable donde busco el id atraves de contexto con una expresion lamda
+		                var futbolista = context.futbolistas.FirstOrDefault(f => f.id == id);
+		                //retorno con el metodo OK
+		                return Ok(futbolista);
+		            }
+		            catch (Exception ex)
+		            {
+
+		                return BadRequest(ex.Message);
+		            }
+		        }
+
+		        // POST api/<FutbolistaController>
+		        [HttpPost]
+		        //              el cuerpo que recibo es de tipo Futbolista asi que importo su modelo
+		        public ActionResult Post([FromBody] Futbolista futbolista)
+		        {
+		            try
+		            {
+		                //agrego mi contexto de datos
+		                context.futbolistas.Add(futbolista);
+		                //guardo los cambios
+		                context.SaveChanges();
+		                //retorno el objeto(todos los datos recien ingresados) recien insertado
+		                //para obtener el id del registro recien ingresado utilizo la funcion GetFutbolista
+		                return CreatedAtRoute("GetFutbolista", new { id = futbolista.id},futbolista);
+		            }
+		            catch (Exception ex)
+		            {
+		                return BadRequest(ex.Message);
+		            }
+		        }
+
+		        // PUT api/<FutbolistaController>/5
+		        [HttpPut("{id}")]
+		        public ActionResult Put(int id, [FromBody] Futbolista futbolista)
+		        {
+		            try
+		            {
+		                //valido si existe un id en la base de datos con el que se ingreso
+		                //id de parametro con el del body
+		                if (futbolista.id == id)
+		                {
+		                    //modifico el registro
+		                    context.Entry(futbolista).State = EntityState.Modified;
+		                    //guardo los cambios
+		                    context.SaveChanges();
+		                    //retorno el objeto llamado la funcion GetFutbolista
+		                    return CreatedAtRoute("GetFutbolista", new { id = futbolista.id }, futbolista);
+		                }else
+		                {
+		                    return BadRequest();
+		                }
+		            }
+		            catch (Exception ex)
+		            {
+
+		                return BadRequest(ex.Message);
+		            }
+		        }
+
+		        // DELETE api/<FutbolistaController>/5
+		        [HttpDelete("{id}")]
+		        public ActionResult Delete(int id)
+		        {
+		            try
+		            {
+		                //creo una variable y le asigno el valor del resultado de la busqueda por id con expresion lamda
+		                var futbolista = context.futbolistas.FirstOrDefault(f => f.id == id);
+		                //si  existe resultado donde se encuentre el id
+		                if (futbolista != null)
+		                {
+		                    //remuevo el registro
+		                    context.futbolistas.Remove(futbolista);
+		                    //guardo los cambios
+		                    context.SaveChanges();
+		                    //retorno el id solo para confirmar el registro borrado
+		                    return Ok(id);
+		                }
+		                else
+		                {
+		                    return BadRequest();
+		                }
+		            }
+		            catch (Exception ex)
+		            {
+
+		                return BadRequest(ex.Message);
+		            }
+		        }
+		    }
+		}
+
+
+	****** CONFIGURAR LA CONEXION CON LA BD ******
+- Esto se hace en el archivo appsettings.jon
+	{
+	  "Logging": {
+	    "LogLevel": {
+	      "Default": "Information",
+	      "Microsoft": "Warning",
+	      "Microsoft.Hosting.Lifetime": "Information"
+	    }
+	  },
+	  "ConnectionStrings": {
+	    //este es un alias, conexion por autentificación de windows
+	    "conexion": "Server=DESKTOP-AS47IGS; Database=sistemaDb; Trusted_Connection=True;"
+	    //conexion por autentificación sql
+	    //            servidor                   db                    usuario                     configuración para multiples coneccioens
+	    //"Conexion": "data source=DESKTOP-AS47IGS;initial catalog=api; user id=sa; password=123456789;MultipleActiveResultSets=true"
+	  },
+	  "AllowedHosts": "*"
+	}
+
+
+	****** Mandar a llamar la coneccion con la bd ******
+- esto es en el archivo Startup.cs
+- agrego la siguiente linea en ConfigureServices
+	public void ConfigureServices(IServiceCollection services)
+    {
+        services.AddRazorPages();
+        //para esto debo importar el contexto de mi carpeta context e instalar un paquete de NuGet
+        //Microsoft.EntityFrameworkCore.sqlServer
+        //importo la libreria Microsoft.EntityFrameworkCore;
+        services.AddDbContext<AppDbContext>(options=>options.UseSqlServer(Configuration.GetConnectionString("conexion")));
+    }
+
+	******  ******
+
+
+
+ -->
